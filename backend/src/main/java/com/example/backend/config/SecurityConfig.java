@@ -37,6 +37,7 @@ public class SecurityConfig {
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/files/**").permitAll()
                 .requestMatchers("/api/premium/**").permitAll()
+                .requestMatchers("/api/auth/register").permitAll()
                 .anyRequest().permitAll()
             )
             .headers(h -> h.frameOptions(f -> f.sameOrigin()))

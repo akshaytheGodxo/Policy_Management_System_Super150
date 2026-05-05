@@ -1,230 +1,130 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-
-interface Policy {
-  id: string;
-  name: string;
-  category: string;
-  status: 'active' | 'draft' | 'archived';
-  lastUpdated: string;
-  author: string;
-}
+import { useState, useEffect } from "react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { api, type Policy, type Product } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function PoliciesPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'draft' | 'archived'>('all');
+  const { user } = useAuth();
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ productId: "", age: "", smoker: false, isSportsVehicle: false });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const policies: Policy[] = [
-    {
-      id: '1',
-      name: 'Data Protection Act 2024',
-      category: 'Compliance',
-      status: 'active',
-      lastUpdated: '2024-05-01',
-      author: 'John Doe',
-    },
-    {
-      id: '2',
-      name: 'Employee Code of Conduct',
-      category: 'HR',
-      status: 'active',
-      lastUpdated: '2024-04-28',
-      author: 'Jane Smith',
-    },
-    {
-      id: '3',
-      name: 'Information Security Policy',
-      category: 'Security',
-      status: 'active',
-      lastUpdated: '2024-04-25',
-      author: 'Mike Johnson',
-    },
-    {
-      id: '4',
-      name: 'Remote Work Guidelines',
-      category: 'HR',
-      status: 'draft',
-      lastUpdated: '2024-04-20',
-      author: 'Sarah Williams',
-    },
-    {
-      id: '5',
-      name: 'Financial Control Procedures',
-      category: 'Finance',
-      status: 'active',
-      lastUpdated: '2024-04-18',
-      author: 'Robert Brown',
-    },
-    {
-      id: '6',
-      name: 'Social Media Policy',
-      category: 'Communications',
-      status: 'archived',
-      lastUpdated: '2024-03-15',
-      author: 'Emily Davis',
-    },
-  ];
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      api.get<Policy[]>(`/api/dashboard/policies/user/${user.id}`),
+      api.get<Product[]>("/api/admin/products"),
+    ])
+      .then(([p, pr]) => {
+        setPolicies(p);
+        setProducts(pr);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [user]);
 
-  const filteredPolicies = policies.filter((policy) => {
-    const matchesSearch =
-      policy.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      policy.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || policy.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const getStatusBadge = (status: string) => {
-    const badgeStyles = {
-      active: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300',
-      draft: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300',
-      archived: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300',
-    };
-    return badgeStyles[status as keyof typeof badgeStyles] || badgeStyles.active;
+  const handlePurchase = async () => {
+    if (!form.productId || !form.age) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await api.post<Policy>("/api/policies/purchase", {
+        userId: user!.id,
+        productId: parseInt(form.productId),
+        age: parseInt(form.age),
+        smoker: form.smoker,
+        isSportsVehicle: form.isSportsVehicle,
+      });
+      setShowModal(false);
+      setForm({ productId: "", age: "", smoker: false, isSportsVehicle: false });
+      const updated = await api.get<Policy[]>(`/api/dashboard/policies/user/${user!.id}`);
+      setPolicies(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Purchase failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const getCategoryBadge = (category: string) => {
-    const colors: Record<string, string> = {
-      Compliance: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300',
-      HR: 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300',
-      Security: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300',
-      Finance: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-300',
-      Communications: 'bg-pink-100 dark:bg-pink-900/20 text-pink-800 dark:text-pink-300',
-    };
-    return colors[category] || colors.Compliance;
-  };
+  if (loading) return <DashboardLayout><div className="text-center py-20 text-gray-500">Loading...</div></DashboardLayout>;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
-        <div className="h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-            Policies
-          </h1>
-          <button className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-            + New Policy
-          </button>
+    <DashboardLayout>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Policies</h2>
+        <button onClick={() => setShowModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+          + Purchase Policy
+        </button>
+      </div>
+
+      {policies.length === 0 ? (
+        <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <p className="text-gray-500 text-lg">No policies yet. Purchase your first policy!</p>
         </div>
-      </header>
-
-      <main className="p-4 sm:p-6 lg:p-8">
-        {/* Filters Section */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search policies..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-
-          {/* Status Filter */}
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-          </select>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {policies.map((p) => (
+            <div key={p.id} className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-mono font-semibold text-indigo-600 dark:text-indigo-400">{p.policyNumber}</span>
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded ${p.status === "ACTIVE" ? "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300" : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
+                  {p.status}
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{p.productName}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{p.userName}</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Premium</span><span className="font-semibold text-gray-900 dark:text-white">${p.premium}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Start</span><span className="text-gray-900 dark:text-white">{new Date(p.startDate).toLocaleDateString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">End</span><span className="text-gray-900 dark:text-white">{new Date(p.endDate).toLocaleDateString()}</span></div>
+              </div>
+              {p.pdfPath && (
+                <a href={`http://localhost:8081${p.pdfPath}`} target="_blank" rel="noopener noreferrer" className="mt-4 block text-center text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                  Download PDF
+                </a>
+              )}
+            </div>
+          ))}
         </div>
+      )}
 
-        {/* Table Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
-                    Policy Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
-                    Author
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
-                    Last Updated
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredPolicies.length > 0 ? (
-                  filteredPolicies.map((policy) => (
-                    <tr
-                      key={policy.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        {policy.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getCategoryBadge(
-                            policy.category,
-                          )}`}
-                        >
-                          {policy.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadge(
-                            policy.status,
-                          )}`}
-                        >
-                          {policy.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                        {policy.author}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(policy.lastUpdated).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium mr-4">
-                          View
-                        </button>
-                        <button className="text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium">
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center">
-                      <p className="text-gray-500 dark:text-gray-400">No policies found</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
-          <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {filteredPolicies.length} of {policies.length} policies
-            </p>
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Purchase Policy</h3>
+            {error && <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">{error}</div>}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Product</label>
+                <select value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                  <option value="">Select product</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.name} - ${p.basePremium}/mo</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Age</label>
+                <input type="number" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" />
+              </div>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={form.smoker} onChange={(e) => setForm({ ...form, smoker: e.target.checked })} className="rounded" /> Smoker</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={form.isSportsVehicle} onChange={(e) => setForm({ ...form, isSportsVehicle: e.target.checked })} className="rounded" /> Sports Vehicle</label>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => { setShowModal(false); setError(""); }} className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+              <button onClick={handlePurchase} disabled={submitting || !form.productId || !form.age} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                {submitting ? "Processing..." : "Purchase"}
+              </button>
+            </div>
           </div>
         </div>
-      </main>
-    </div>
+      )}
+    </DashboardLayout>
   );
 }
