@@ -16,8 +16,8 @@ export default function SignInPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Add your API call herepagp
-      const response = await fetch('/api/signin', {
+      // TODO: Add your API call here
+      const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,7 +183,7 @@ export default function SignInPage() {
             <p className="text-gray-600 dark:text-gray-300">
               Don't have an account?{' '}
               <Link
-                href="/signup"
+                href="/auth/signup"
                 className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
               >
                 Sign up

@@ -48,7 +48,7 @@ export default function SignupPage() {
 
     try {
       // TODO: Add your API call here
-      const response = await fetch('/api/signup', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -269,7 +269,7 @@ export default function SignupPage() {
             <p className="text-gray-600 dark:text-gray-300">
               Already a member?{' '}
               <Link
-                href="/signin"
+                href="/auth/signin"
                 className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
               >
                 Sign in
